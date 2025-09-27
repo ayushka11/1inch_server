@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --experimental-json-modules src/limitOrder.js",
+    "limit-order": "node src/limitOrder.js"
   },
   "repository": {
     "type": "git",
@@ -19,8 +21,9 @@
   },
   "homepage": "https://github.com/ayushka11/1inch#readme",
   "dependencies": {
+    "@1inch/limit-order-protocol": "^2.0.5",
     "@1inch/limit-order-sdk": "^5.2.0",
     "dotenv": "^17.2.2",
-    "ethers": "^6.15.0"
+    "ethers": "^5.7.2"
   }
 }
