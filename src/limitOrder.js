@@ -96,7 +96,7 @@ async function submitTo1inchAPI(orderHash, signature, orderData) {
   try {
     console.log("Submitting to 1inch API...");
     const response = await axios.post(url, body, config);
-    console.log("✅ Order submitted successfully to 1inch API!");
+    console.log("Order submitted successfully to 1inch API!");
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -177,7 +177,7 @@ async function createOrderManual(makerAsset, takerAsset, makingAmount, takingAmo
  */
 async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, makingAmount, takingAmount) {
   console.log(`\n=== Creating PUBLIC ${makerTokenSymbol} -> ${takerTokenSymbol} Order ===`);
-  console.log("🔓 Public Order: No expiration, compatible with 1inch API");
+  console.log(" Public Order: No expiration, compatible with 1inch API");
   
   // Validate token symbols
   if (!VALID_TOKENS[makerTokenSymbol] || !VALID_TOKENS[takerTokenSymbol]) {
@@ -227,7 +227,7 @@ async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, making
     });
     console.log("Approval tx:", approveTx.hash);
     await approveTx.wait();
-    console.log("✅ Approval successful");
+    console.log("Approval successful");
   }
   
   let orderResult;
@@ -235,7 +235,7 @@ async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, making
   
   // TRY SDK FIRST for public orders
   try {
-    console.log("🚀 Attempting order creation with SDK...");
+    console.log("Attempting order creation with SDK...");
     
     const sdk = new Sdk({
       authKey,
@@ -261,7 +261,7 @@ async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, making
       makerTraits
     );
     
-    console.log("✅ SDK order creation successful!");
+    console.log("SDK order creation successful!");
     
     // Sign the order
     const typedData = order.getTypedData(chainId);
@@ -279,11 +279,11 @@ async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, making
     };
     
     methodUsed = "SDK";
-    console.log("✅ Order signed with SDK method!");
+    console.log("Order signed with SDK method!");
     
   } catch (sdkError) {
-    console.log("⚠️ SDK failed:", sdkError.message);
-    console.log("🔄 Falling back to manual method...");
+    console.log("SDK failed:", sdkError.message);
+    console.log("Falling back to manual method...");
     
     // FALLBACK TO MANUAL METHOD
     try {
@@ -294,10 +294,10 @@ async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, making
         takingAmountWei
       );
       methodUsed = "Manual";
-      console.log("✅ Manual order creation successful!");
+      console.log("Manual order creation successful!");
       
     } catch (manualError) {
-      console.error("❌ Manual method also failed:", manualError.message);
+      console.error("Manual method also failed:", manualError.message);
       throw new Error("Both SDK and manual methods failed");
     }
   }
@@ -320,7 +320,7 @@ async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, making
   
   const filename = `public_order_${makerTokenSymbol}_to_${takerTokenSymbol}_${Date.now()}.json`;
   fs.writeFileSync(filename, JSON.stringify(signedOrder, null, 2));
-  console.log(`✅ Order saved to ${filename}`);
+  console.log(`Order saved to ${filename}`);
   
   // Submit to 1inch API
   let apiResult = null;
@@ -332,20 +332,20 @@ async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, making
     fs.writeFileSync(filename, JSON.stringify(signedOrder, null, 2));
     
   } catch (apiError) {
-    console.log("⚠️ Order created but API submission failed");
-    console.log("💡 Order is still valid and saved locally");
+    console.log("Order created but API submission failed");
+    console.log("Order is still valid and saved locally");
   }
   
-  console.log("\n=== ✅ PUBLIC Order Complete! ===");
-  console.log(`🎯 Method Used: ${methodUsed}`);
-  console.log(`🎯 Selling: ${makingAmount} ${makerToken.symbol}`);
-  console.log(`🎯 For: ${takingAmount} ${takerToken.symbol}`);
-  console.log(`🎯 Order Hash: ${orderResult.orderHash}`);
-  console.log(`🎯 File: ${filename}`);
-  console.log(`🎯 Expires: Never (public order)`);
+  console.log("\n=== PUBLIC Order Complete! ===");
+  console.log(`Method Used: ${methodUsed}`);
+  console.log(`Selling: ${makingAmount} ${makerToken.symbol}`);
+  console.log(`For: ${takingAmount} ${takerToken.symbol}`);
+  console.log(`Order Hash: ${orderResult.orderHash}`);
+  console.log(`File: ${filename}`);
+  console.log(`Expires: Never (public order)`);
   
   if (apiResult) {
-    console.log(`🎯 API Status: Successfully submitted`);
+    console.log(`API Status: Successfully submitted`);
   }
   
   return {
@@ -402,19 +402,19 @@ async function testPublicOrders() {
     // Test with your WETH balance
     const wethBalance = await getTokenBalance("WETH");
     if (parseFloat(wethBalance) > 0) {
-      console.log(`\n🎯 Testing with WETH balance: ${wethBalance}`);
+      console.log(`\nTesting with WETH balance: ${wethBalance}`);
       
       // Create a small test order: sell 50% of WETH for USDC
       const sellAmount = (parseFloat(wethBalance) * 0.5).toFixed(6);
       const expectedUSDC = (parseFloat(sellAmount) * 2650).toFixed(2); // ~$2650/ETH
       
-      console.log(`\n📋 Test Order: ${sellAmount} WETH -> ${expectedUSDC} USDC`);
+      console.log(`\nTest Order: ${sellAmount} WETH -> ${expectedUSDC} USDC`);
       
       // Uncomment to actually create the order:
       // await createPublicLimitOrder("WETH", "USDC", sellAmount, expectedUSDC);
       
     } else {
-      console.log("\n💡 No WETH balance found for testing");
+      console.log("\nNo WETH balance found for testing");
     }
     
   } catch (error) {
