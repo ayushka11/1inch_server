@@ -24,10 +24,18 @@ const chainId = parseInt(process.env.CHAIN_ID) || 1;
 const provider = new providers.JsonRpcProvider(rpcUrl);
 
 const ETH_TOKENS = {
+  ETH: "0x73bFE136fEba2c73F441605752b2B8CAAB6843Ec", // ETH placeholder address
   WETH: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
   USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
   DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
 };
+
+// Check if address is ETH (zero address or ETH keyword)
+function isETH(tokenAddress) {
+  return tokenAddress === ETH_TOKENS.ETH || 
+         tokenAddress.toLowerCase() === "0x73bFE136fEba2c73F441605752b2B8CAAB6843Ec" ||
+         tokenAddress.toLowerCase() === "eth";
+}
 
 // Function to get optimal gas price for Ethereum
 async function getOptimalGasPrice() {
@@ -64,6 +72,20 @@ async function verifyContract(address, name) {
 }
 
 async function checkBalance(tokenAddress, walletAddress) {
+  // Handle ETH balance
+  if (isETH(tokenAddress)) {
+    try {
+      const balance = await provider.getBalance(walletAddress);
+      return {
+        balance,
+        formatted: ethers.utils.formatEther(balance)
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Handle token balance
   const tokenContract = new Contract(tokenAddress, erc20AbiFragment, provider);
   try {
     const balance = await tokenContract.balanceOf(walletAddress);
@@ -76,7 +98,58 @@ async function checkBalance(tokenAddress, walletAddress) {
   }
 }
 
-// Main function to create limit order
+// Function to wrap ETH to WETH
+async function wrapETH(wallet, ethAmount) {
+  try {
+    console.log(`Wrapping ${ethers.utils.formatEther(ethAmount)} ETH to WETH...`);
+    
+    const wethContract = new Contract(ETH_TOKENS.WETH, erc20AbiFragment, wallet);
+    const gasPrice = await getOptimalGasPrice();
+    
+    // Call deposit function with ETH value
+    const depositTx = await wethContract.deposit({
+      value: ethAmount,
+      gasPrice: gasPrice,
+      gasLimit: 60000 // Standard gas limit for WETH deposit
+    });
+    
+    console.log("Wrapping transaction sent:", depositTx.hash);
+    await depositTx.wait();
+    console.log("ETH wrapped to WETH successfully!");
+    
+    return depositTx;
+    
+  } catch (error) {
+    throw new Error(`Failed to wrap ETH: ${error.message}`);
+  }
+}
+
+// Function to unwrap WETH to ETH
+async function unwrapWETH(wallet, wethAmount) {
+  try {
+    console.log(`Unwrapping ${ethers.utils.formatEther(wethAmount)} WETH to ETH...`);
+    
+    const wethContract = new Contract(ETH_TOKENS.WETH, erc20AbiFragment, wallet);
+    const gasPrice = await getOptimalGasPrice();
+    
+    // Call withdraw function
+    const withdrawTx = await wethContract.withdraw(wethAmount, {
+      gasPrice: gasPrice,
+      gasLimit: 60000 // Standard gas limit for WETH withdraw
+    });
+    
+    console.log("Unwrapping transaction sent:", withdrawTx.hash);
+    await withdrawTx.wait();
+    console.log("WETH unwrapped to ETH successfully!");
+    
+    return withdrawTx;
+    
+  } catch (error) {
+    throw new Error(`Failed to unwrap WETH: ${error.message}`);
+  }
+}
+
+// Main function to create limit order with ETH wrapping support
 async function createLimitOrder({
   makerTokenAddress,
   takerTokenAddress,
@@ -94,6 +167,32 @@ async function createLimitOrder({
     // Create wallet instance
     const wallet = new Wallet(privateKey, provider);
     
+    // Handle ETH wrapping if needed
+    let actualMakerToken = makerTokenAddress;
+    let actualTakerToken = takerTokenAddress;
+    
+    if (isETH(makerTokenAddress)) {
+      console.log("Maker token is ETH, will wrap to WETH");
+      actualMakerToken = ETH_TOKENS.WETH;
+      
+      // Convert amounts to BigNumber
+      const makingAmountBN = ethers.BigNumber.from(makerAmount);
+      
+      // Check ETH balance
+      const ethBalance = await provider.getBalance(wallet.address);
+      if (ethBalance.lt(makingAmountBN)) {
+        throw new Error(`Insufficient ETH balance. Required: ${ethers.utils.formatEther(makingAmountBN)}, Available: ${ethers.utils.formatEther(ethBalance)}`);
+      }
+      
+      // Wrap ETH to WETH
+      await wrapETH(wallet, makingAmountBN);
+    }
+    
+    if (isETH(takerTokenAddress)) {
+      console.log("Taker token is ETH, converting to WETH for order");
+      actualTakerToken = ETH_TOKENS.WETH;
+    }
+    
     // Get domain and contract address
     const domain = getLimitOrderV4Domain(chainId);
     const limitOrderContract = domain.verifyingContract;
@@ -103,19 +202,19 @@ async function createLimitOrder({
     const takingAmountBN = ethers.BigNumber.from(takerAmount);
     
     console.log(`Creating limit order:`);
-    console.log(`Maker: ${makerTokenAddress}`);
-    console.log(`Taker: ${takerTokenAddress}`);
+    console.log(`Original Maker: ${makerTokenAddress} -> Actual: ${actualMakerToken}`);
+    console.log(`Original Taker: ${takerTokenAddress} -> Actual: ${actualTakerToken}`);
     console.log(`Making Amount: ${makerAmount}`);
     console.log(`Taking Amount: ${takerAmount}`);
     
-    // Check maker token balance
-    const makerBalance = await checkBalance(makerTokenAddress, wallet.address);
+    // Check maker token balance (now WETH if it was ETH)
+    const makerBalance = await checkBalance(actualMakerToken, wallet.address);
     if (!makerBalance || makerBalance.balance.lt(makingAmountBN)) {
       throw new Error(`Insufficient maker token balance. Required: ${makerAmount}, Available: ${makerBalance?.balance.toString() || '0'}`);
     }
     
     // Check and approve maker token if needed
-    const makerTokenContract = new Contract(makerTokenAddress, erc20AbiFragment, wallet);
+    const makerTokenContract = new Contract(actualMakerToken, erc20AbiFragment, wallet);
     const currentAllowance = await makerTokenContract.allowance(wallet.address, limitOrderContract);
     
     if (currentAllowance.lt(makingAmountBN)) {
@@ -150,10 +249,10 @@ async function createLimitOrder({
 
     console.log("Creating order with SDK...");
 
-    // Create the order
+    // Create the order using actual token addresses (WETH instead of ETH)
     const order = await sdk.createOrder({
-      makerAsset: new Address(makerTokenAddress),
-      takerAsset: new Address(takerTokenAddress),
+      makerAsset: new Address(actualMakerToken),
+      takerAsset: new Address(actualTakerToken),
       makingAmount: BigInt(makingAmountBN.toString()),
       takingAmount: BigInt(takingAmountBN.toString()),
       maker: new Address(wallet.address),
@@ -196,10 +295,13 @@ async function createLimitOrder({
       expiration: expiration.toString(),
       expirationDate: new Date(Number(expiration) * 1000).toISOString(),
       maker: wallet.address,
-      makerToken: makerTokenAddress,
-      takerToken: takerTokenAddress,
+      originalMakerToken: makerTokenAddress,
+      originalTakerToken: takerTokenAddress,
+      actualMakerToken: actualMakerToken,
+      actualTakerToken: actualTakerToken,
       makingAmount: makerAmount,
-      takingAmount: takerAmount
+      takingAmount: takerAmount,
+      ethWrapped: isETH(makerTokenAddress) ? ethers.utils.formatEther(makingAmountBN) : null
     };
     
     return result;
@@ -216,6 +318,16 @@ async function createLimitOrder({
 // Function to get token info
 async function getTokenInfo(tokenAddress) {
   try {
+    // Handle ETH
+    if (isETH(tokenAddress)) {
+      return {
+        address: tokenAddress,
+        symbol: "ETH",
+        name: "Ethereum",
+        decimals: 18
+      };
+    }
+
     const tokenContract = new Contract(tokenAddress, erc20AbiFragment, provider);
     const [symbol, name, decimals] = await Promise.all([
       tokenContract.symbol(),
@@ -287,6 +399,9 @@ module.exports = {
   estimateApprovalGas,
   checkBalance,
   verifyContract,
+  wrapETH,
+  unwrapWETH,
+  isETH,
   ETH_TOKENS,
   provider,
   chainId
