@@ -12,6 +12,14 @@ const {
   ETH_TOKENS 
 } = require("./limitOrder.js");
 
+// Import swap functions
+import { 
+  performTokenSwap, 
+  getSwapQuote, 
+  getSupportedTokens, 
+  checkTokenAllowance 
+} from "./swap";
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -45,6 +53,208 @@ app.use((req, res, next) => {
   }
   
   next();
+});
+
+// Token swap endpoint
+app.post("/swap", async (req, res) => {
+  try {
+    console.log("Raw swap request body:", req.body);
+    console.log("Body type:", typeof req.body);
+    
+    // Handle case where body might be a string
+    let bodyData = req.body;
+    if (typeof bodyData === 'string') {
+      try {
+        bodyData = JSON.parse(bodyData);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid JSON format in request body"
+        });
+      }
+    }
+
+    const {
+      srcToken,
+      dstToken,
+      amount,
+      slippage = 1,
+      privateKey,
+      walletAddress
+    } = bodyData;
+
+    // Validate required fields
+    if (!srcToken || !dstToken || !amount || !privateKey || !walletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: srcToken, dstToken, amount, privateKey, walletAddress",
+        received: {
+          srcToken: !!srcToken,
+          dstToken: !!dstToken,
+          amount: !!amount,
+          privateKey: !!privateKey,
+          walletAddress: !!walletAddress
+        }
+      });
+    }
+
+    // Validate slippage
+    const slippageNum = parseFloat(slippage);
+    if (isNaN(slippageNum) || slippageNum < 0 || slippageNum > 50) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid slippage. Must be a number between 0 and 50"
+      });
+    }
+
+    console.log("Performing token swap with params:", {
+      srcToken,
+      dstToken,
+      amount,
+      slippage: slippageNum,
+      walletAddress,
+      privateKey: "***HIDDEN***"
+    });
+
+    const result = await performTokenSwap({
+      srcToken,
+      dstToken,
+      amount,
+      slippage: slippageNum,
+      privateKey,
+      walletAddress
+    });
+
+    res.json(result);
+
+  } catch (error) {
+    console.error("Swap API error:", error);
+    res.status(500).json({
+      success: false,
+      error: (error as Error).message || "Internal server error"
+    });
+  }
+});
+
+// Get swap quote endpoint
+app.post("/swap/quote", async (req, res) => {
+  try {
+    console.log("Raw quote request body:", req.body);
+    
+    // Handle case where body might be a string
+    let bodyData = req.body;
+    if (typeof bodyData === 'string') {
+      try {
+        bodyData = JSON.parse(bodyData);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid JSON format in request body"
+        });
+      }
+    }
+
+    const { srcToken, dstToken, amount, walletAddress } = bodyData;
+
+    if (!srcToken || !dstToken || !amount || !walletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: srcToken, dstToken, amount, walletAddress",
+        received: {
+          srcToken: !!srcToken,
+          dstToken: !!dstToken,
+          amount: !!amount,
+          walletAddress: !!walletAddress
+        }
+      });
+    }
+
+    console.log("Getting swap quote with params:", {
+      srcToken,
+      dstToken,
+      amount,
+      walletAddress
+    });
+
+    const result = await getSwapQuote({
+      srcToken,
+      dstToken,
+      amount,
+      walletAddress
+    });
+
+    res.json(result);
+
+  } catch (error) {
+    console.error("Quote API error:", error);
+    res.status(500).json({
+      success: false,
+      error: (error as Error).message
+    });
+  }
+});
+
+// Get supported tokens endpoint
+app.get("/swap/tokens", async (req, res) => {
+  try {
+    console.log("Fetching supported tokens...");
+    const result = await getSupportedTokens();
+    res.json(result);
+  } catch (error) {
+    console.error("Get tokens API error:", error);
+    res.status(500).json({
+      success: false,
+      error: (error as Error).message
+    });
+  }
+});
+
+// Check token allowance endpoint
+app.post("/swap/allowance", async (req, res) => {
+  try {
+    console.log("Raw allowance request body:", req.body);
+    
+    // Handle case where body might be a string
+    let bodyData = req.body;
+    if (typeof bodyData === 'string') {
+      try {
+        bodyData = JSON.parse(bodyData);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid JSON format in request body"
+        });
+      }
+    }
+
+    const { tokenAddress, walletAddress } = bodyData;
+
+    if (!tokenAddress || !walletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: tokenAddress, walletAddress",
+        received: {
+          tokenAddress: !!tokenAddress,
+          walletAddress: !!walletAddress
+        }
+      });
+    }
+
+    console.log("Checking token allowance with params:", {
+      tokenAddress,
+      walletAddress
+    });
+
+    const result = await checkTokenAllowance(tokenAddress, walletAddress);
+    res.json(result);
+
+  } catch (error) {
+    console.error("Allowance API error:", error);
+    res.status(500).json({
+      success: false,
+      error: (error as Error).message
+    });
+  }
 });
 
 // Create limit order endpoint
@@ -142,12 +352,15 @@ app.post("/limit-order", async (req, res) => {
 app.get("/token-info/:address", async (req, res) => {
   try {
     const { address } = req.params;
+    console.log("Getting token info for:", address);
+    
     const tokenInfo = await getTokenInfo(address);
     res.json({
       success: true,
       data: tokenInfo
     });
   } catch (error) {
+    console.error("Token info API error:", error);
     res.status(500).json({
       success: false,
       error: (error as Error).message
@@ -158,7 +371,22 @@ app.get("/token-info/:address", async (req, res) => {
 // Get wallet balances endpoint
 app.post("/wallet-balances", async (req, res) => {
   try {
-    const { walletAddress, tokenAddresses = [] } = req.body;
+    console.log("Raw wallet balances request body:", req.body);
+    
+    // Handle case where body might be a string
+    let bodyData = req.body;
+    if (typeof bodyData === 'string') {
+      try {
+        bodyData = JSON.parse(bodyData);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid JSON format in request body"
+        });
+      }
+    }
+
+    const { walletAddress, tokenAddresses = [] } = bodyData;
     
     if (!walletAddress) {
       return res.status(400).json({
@@ -167,12 +395,15 @@ app.post("/wallet-balances", async (req, res) => {
       });
     }
 
+    console.log("Getting wallet balances for:", { walletAddress, tokenAddresses });
+
     const balances = await getWalletBalances(walletAddress, tokenAddresses);
     res.json({
       success: true,
       data: balances
     });
   } catch (error) {
+    console.error("Wallet balances API error:", error);
     res.status(500).json({
       success: false,
       error: (error as Error).message
@@ -183,14 +414,42 @@ app.post("/wallet-balances", async (req, res) => {
 // Estimate approval gas endpoint
 app.post("/estimate-approval-gas", async (req, res) => {
   try {
-    const { tokenAddress, spenderAddress, amount, privateKey } = req.body;
+    console.log("Raw estimate gas request body:", req.body);
+    
+    // Handle case where body might be a string
+    let bodyData = req.body;
+    if (typeof bodyData === 'string') {
+      try {
+        bodyData = JSON.parse(bodyData);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid JSON format in request body"
+        });
+      }
+    }
+
+    const { tokenAddress, spenderAddress, amount, privateKey } = bodyData;
     
     if (!tokenAddress || !spenderAddress || !amount || !privateKey) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: tokenAddress, spenderAddress, amount, privateKey"
+        error: "Missing required fields: tokenAddress, spenderAddress, amount, privateKey",
+        received: {
+          tokenAddress: !!tokenAddress,
+          spenderAddress: !!spenderAddress,
+          amount: !!amount,
+          privateKey: !!privateKey
+        }
       });
     }
+
+    console.log("Estimating approval gas with params:", {
+      tokenAddress,
+      spenderAddress,
+      amount,
+      privateKey: "***HIDDEN***"
+    });
 
     const gasEstimate = await estimateApprovalGas(tokenAddress, spenderAddress, amount, privateKey);
     res.json({
@@ -198,6 +457,7 @@ app.post("/estimate-approval-gas", async (req, res) => {
       data: gasEstimate
     });
   } catch (error) {
+    console.error("Estimate gas API error:", error);
     res.status(500).json({
       success: false,
       error: (error as Error).message
@@ -213,18 +473,6 @@ app.get("/tokens", (req, res) => {
   });
 });
 
-// Run swap (TS file) - keeping existing functionality
-app.post("/swap", (req, res) => {
-  const scriptPath = path.join(__dirname, "swap.ts");
-  exec(`npx ts-node ${scriptPath}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(stderr);
-      return res.status(500).json({ error: stderr });
-    }
-    res.json({ output: stdout });
-  });
-});
-
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ 
@@ -236,11 +484,14 @@ app.get("/health", (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log("Available endpoints:");
+  console.log("  POST /swap - Execute token swap");
+  console.log("  POST /swap/quote - Get swap quote");
+  console.log("  GET /swap/tokens - Get supported tokens");
+  console.log("  POST /swap/allowance - Check token allowance");
   console.log("  POST /limit-order - Create a limit order");
   console.log("  GET /token-info/:address - Get token information");
   console.log("  POST /wallet-balances - Get wallet balances");
   console.log("  POST /estimate-approval-gas - Estimate gas for token approval");
   console.log("  GET /tokens - Get common token addresses");
-  console.log("  POST /swap - Execute swap (existing functionality)");
   console.log("  GET /health - Health check");
 });
