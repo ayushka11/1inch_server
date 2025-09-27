@@ -1,7 +1,7 @@
 require('dotenv').config();
 const ethers = require("ethers");
 const { Wallet, providers, Contract } = require("ethers");
-const { getLimitOrderV4Domain } = require("@1inch/limit-order-sdk");
+const { LimitOrder, getLimitOrderV4Domain, Address, MakerTraits, Sdk, randBigInt, FetchProviderConnector } = require("@1inch/limit-order-sdk");
 const fs = require("fs");
 const axios = require("axios");
 
@@ -32,6 +32,9 @@ const ETH_TOKENS = {
 };
 
 const ETH_PRICE_USD = 5000;
+
+// Configure this as needed
+const ORDER_EXPIRATION_HOURS = 24; 
 
 // Function to get optimal gas price for Ethereum
 async function getOptimalGasPrice() {
@@ -69,58 +72,6 @@ async function verifyContract(address, name) {
   }
 }
 
-// Function to submit order to 1inch API - CORRECT FORMAT
-async function submitOrderTo1inch(orderHash, signature, orderData) {
-  const url = `https://api.1inch.dev/orderbook/v4.1/${chainId}`;
-  
-  // Convert all addresses to lowercase strings as per API schema
-  const body = {
-    "orderHash": orderHash.toLowerCase(),
-    "signature": signature.toLowerCase(), 
-    "data": {
-      "makerAsset": orderData.makerAsset.toLowerCase(),
-      "takerAsset": orderData.takerAsset.toLowerCase(),
-      "maker": orderData.maker.toLowerCase(),
-      "receiver": "0x0000000000000000000000000000000000000000",
-      "makingAmount": orderData.makingAmount,
-      "takingAmount": orderData.takingAmount,
-      "salt": orderData.salt,
-      "extension": "0x",
-      "makerTraits": "0"
-    }
-  };
-
-  // DEBUG: Print exact request being sent
-  console.log("=== DEBUG: API Request Body ===");
-  console.log(JSON.stringify(body, null, 2));
-  console.log("===============================");
-
-  try {
-<<<<<<< Updated upstream
-    console.log("Submitting to 1inch API...");
-    const response = await axios.post(url, body, config);
-    console.log("Order submitted successfully to 1inch API!");
-=======
-    const response = await axios.post(url, body, {
-      headers: {
-        "Authorization": `Bearer ${authKey}`,
-        "Content-Type": "application/json",
-      },
-      timeout: 15000,
-    });
-    console.log("✅ Order submitted to 1inch API successfully!");
->>>>>>> Stashed changes
-    return response.data;
-  } catch (error) {
-    if (error.response) {
-      console.error("API Error:", error.response.status, error.response.data);
-    } else {
-      console.error("Network Error:", error.message);
-    }
-    throw error;
-  }
-}
-
 async function checkBalance(tokenAddress, walletAddress) {
   const tokenContract = new Contract(tokenAddress, erc20AbiFragment, provider);
   try {
@@ -134,54 +85,17 @@ async function checkBalance(tokenAddress, walletAddress) {
   }
 }
 
-<<<<<<< Updated upstream
-/**
- * Create a PUBLIC limit order (no expiration) - tries SDK first, falls back to manual
- * @param {string} makerTokenSymbol - Symbol of token to sell
- * @param {string} takerTokenSymbol - Symbol of token to buy  
- * @param {string} makingAmount - Amount to sell (in token units)
- * @param {string} takingAmount - Amount to receive (in token units)
- */
-async function createPublicLimitOrder(makerTokenSymbol, takerTokenSymbol, makingAmount, takingAmount) {
-  console.log(`\n=== Creating PUBLIC ${makerTokenSymbol} -> ${takerTokenSymbol} Order ===`);
-  console.log(" Public Order: No expiration, compatible with 1inch API");
-  
-  // Validate token symbols
-  if (!VALID_TOKENS[makerTokenSymbol] || !VALID_TOKENS[takerTokenSymbol]) {
-    throw new Error(`Invalid token symbols. Valid tokens: ${Object.keys(VALID_TOKENS).join(', ')}`);
-  }
-  
-  const makerToken = VALID_TOKENS[makerTokenSymbol];
-  const takerToken = VALID_TOKENS[takerTokenSymbol];
-  
-  // Convert amounts to wei/token units
-  const makingAmountWei = ethers.utils.parseUnits(makingAmount, makerToken.decimals);
-  const takingAmountWei = ethers.utils.parseUnits(takingAmount, takerToken.decimals);
-  
-  console.log(`Selling: ${makingAmount} ${makerToken.symbol}`);
-  console.log(`For: ${takingAmount} ${takerToken.symbol}`);
-  console.log(`Rate: ${(parseFloat(takingAmount) / parseFloat(makingAmount)).toFixed(6)} ${takerToken.symbol} per ${makerToken.symbol}`);
-  
-  // Check maker token balance
-  const makerContract = new Contract(makerToken.address, erc20AbiFragment, wallet);
-  const balance = await makerContract.balanceOf(wallet.address);
-  const balanceFormatted = ethers.utils.formatUnits(balance, makerToken.decimals);
-=======
-async function createETHOrderManual(ethBalance, optimalGasPrice) {
+async function createETHOrderWithSDK(ethBalance, optimalGasPrice) {
   const domain = getLimitOrderV4Domain(chainId);
   const limitOrderContract = domain.verifyingContract;
->>>>>>> Stashed changes
-  
-  const makerAsset = ETH_TOKENS.WETH;
-  const takerAsset = ETH_TOKENS.USDC;
   
   const wethBalance = await checkBalance(ETH_TOKENS.WETH, wallet.address);
   if (!wethBalance || wethBalance.balance.eq(0)) {
-    console.log("❌ No WETH balance found");
+    console.log("No WETH balance found");
     return;
   }
   
-  const sellAmount = wethBalance.balance;
+  const sellAmount = wethBalance.balance.div(20);
   const sellFormatted = ethers.utils.formatEther(sellAmount);
   const estimatedUsdValue = parseFloat(sellFormatted) * ETH_PRICE_USD;
   const takingAmount = ethers.utils.parseUnits(estimatedUsdValue.toFixed(2), 6);
@@ -189,7 +103,7 @@ async function createETHOrderManual(ethBalance, optimalGasPrice) {
   console.log(`Selling: ${sellFormatted} WETH for ${ethers.utils.formatUnits(takingAmount, 6)} USDC`);
   
   // Check allowance
-  const wethContract = new Contract(makerAsset, erc20AbiFragment, wallet);
+  const wethContract = new Contract(ETH_TOKENS.WETH, erc20AbiFragment, wallet);
   const currentAllowance = await wethContract.allowance(wallet.address, limitOrderContract);
   
   if (currentAllowance.lt(sellAmount)) {
@@ -199,166 +113,105 @@ async function createETHOrderManual(ethBalance, optimalGasPrice) {
       gasLimit: 50000
     });
     await approveTx.wait();
-<<<<<<< Updated upstream
-    console.log("Approval successful");
-=======
-    console.log("✅ WETH approved");
->>>>>>> Stashed changes
+    console.log("WETH approved");
   }
   
   try {
-<<<<<<< Updated upstream
-    console.log("Attempting order creation with SDK...");
-=======
-    const salt = BigInt(Date.now()).toString();
->>>>>>> Stashed changes
-    
-    // Order structure - EXACT format for 1inch
-    const publicOrder = {
-      salt: salt,
-      maker: wallet.address,
-      receiver: "0x0000000000000000000000000000000000000000",
-      makerAsset: makerAsset,
-      takerAsset: takerAsset,
-      makingAmount: sellAmount.toString(),
-      takingAmount: takingAmount.toString(),
-      extension: "0x",
-      makerTraits: "0"
+    // Create SDK instance
+    const sdk = new Sdk({ 
+      authKey, 
+      networkId: chainId, 
+      httpConnector: new FetchProviderConnector() 
+    });
+
+    // Set up order expiration (2 minutes from now)
+    const expiresIn = BigInt(ORDER_EXPIRATION_HOURS * 60 * 60); // Convert hours to seconds
+    const expiration = BigInt(Math.floor(Date.now() / 1000)) + expiresIn;
+    const UINT_40_MAX = (1n << 40n) - 1n;
+
+    // Create maker traits for NORMAL limit order with correct methods
+    const makerTraits = MakerTraits.default()
+      .withExpiration(expiration)
+      .withNonce(randBigInt(UINT_40_MAX))
+      .allowPartialFills()    // Enable partial fills for normal orders
+      .allowMultipleFills();  // Enable multiple fills for normal orders
+
+    console.log("Creating order with SDK...");
+
+    // Create the order using SDK's createOrder method
+    const order = await sdk.createOrder({
+      makerAsset: new Address(ETH_TOKENS.WETH),
+      takerAsset: new Address(ETH_TOKENS.USDC),
+      makingAmount: BigInt(sellAmount.toString()),
+      takingAmount: BigInt(takingAmount.toString()),
+      maker: new Address(wallet.address),
+    }, makerTraits);
+
+    console.log("Order created with SDK");
+
+    // Get typed data for signing using SDK method
+    const typedData = order.getTypedData();
+    console.log("Typed data generated");
+
+    // Fix the domain to ensure chainId is properly set
+    const cleanDomain = {
+      name: typedData.domain.name,
+      version: typedData.domain.version,
+      chainId: chainId, // Explicitly set chainId as number
+      verifyingContract: typedData.domain.verifyingContract
     };
+
+    console.log("Clean domain:", cleanDomain);
+    console.log("Message:", typedData.message);
+
+    // Use only Order type for signing with clean domain
+    const signature = await wallet._signTypedData(
+      cleanDomain, // Use clean domain
+      { Order: typedData.types.Order }, // Only pass Order type
+      typedData.message
+    );
+
+    console.log("Order signed successfully");
+
+    // Submit order using SDK's submitOrder method
+    await sdk.submitOrder(order, signature);
+
+    console.log("Order submitted to 1inch API successfully!");
+
+    // Get order hash using SDK method
+    const orderHash = order.getOrderHash(chainId);
     
-    // EIP-712 signing
-    const domain = {
-      name: "1inch Limit Order Protocol",
-      version: "4",
-      chainId: chainId,
-      verifyingContract: limitOrderContract
-    };
-    
-<<<<<<< Updated upstream
-    console.log("SDK order creation successful!");
-=======
-    const types = {
-      Order: [
-        { name: "salt", type: "uint256" },
-        { name: "maker", type: "address" },
-        { name: "receiver", type: "address" },
-        { name: "makerAsset", type: "address" },
-        { name: "takerAsset", type: "address" },
-        { name: "makingAmount", type: "uint256" },
-        { name: "takingAmount", type: "uint256" },
-        { name: "extension", type: "bytes" },
-        { name: "makerTraits", type: "uint256" }
-      ]
-    };
->>>>>>> Stashed changes
-    
-    const signature = await wallet._signTypedData(domain, types, publicOrder);
-    const orderHash = ethers.utils._TypedDataEncoder.hash(domain, types, publicOrder);
-    
+    // Save order details locally
     const signedOrder = {
       orderHash: orderHash,
-      order: publicOrder,
+      order: order.build(),
       signature: signature,
-      domain: domain,
-      types: types
+      typedData: { ...typedData, domain: cleanDomain },
+      expiration: expiration.toString()
     };
     
-<<<<<<< Updated upstream
-    methodUsed = "SDK";
-    console.log("Order signed with SDK method!");
-    
-  } catch (sdkError) {
-    console.log("SDK failed:", sdkError.message);
-    console.log("Falling back to manual method...");
-    
-    // FALLBACK TO MANUAL METHOD
-    try {
-      orderResult = await createOrderManual(
-        makerToken.address,
-        takerToken.address,
-        makingAmountWei,
-        takingAmountWei
-      );
-      methodUsed = "Manual";
-      console.log("Manual order creation successful!");
-      
-    } catch (manualError) {
-      console.error("Manual method also failed:", manualError.message);
-      throw new Error("Both SDK and manual methods failed");
-    }
-  }
-  
-  // Save order locally
-  const signedOrder = {
-    ...orderResult,
-    metadata: {
-      makerToken: makerToken.symbol,
-      takerToken: takerToken.symbol,
-      makingAmount,
-      takingAmount,
-      rate: (parseFloat(takingAmount) / parseFloat(makingAmount)).toFixed(6),
-      timestamp: new Date().toISOString(),
-      method: methodUsed,
-      chainId,
-      isPublicOrder: true
-    }
-  };
-  
-  const filename = `public_order_${makerTokenSymbol}_to_${takerTokenSymbol}_${Date.now()}.json`;
-  fs.writeFileSync(filename, JSON.stringify(signedOrder, null, 2));
-  console.log(`Order saved to ${filename}`);
-  
-  // Submit to 1inch API
-  let apiResult = null;
-  try {
-    apiResult = await submitTo1inchAPI(orderResult.orderHash, orderResult.signature, orderResult.order);
-    signedOrder.apiResult = apiResult;
-    
-    // Update saved file with API result
-    fs.writeFileSync(filename, JSON.stringify(signedOrder, null, 2));
-    
-  } catch (apiError) {
-    console.log("Order created but API submission failed");
-    console.log("Order is still valid and saved locally");
-=======
     fs.writeFileSync('limit_order.json', JSON.stringify(signedOrder, null, 2));
-    console.log("✅ Order saved locally");
-    
-    // Submit to 1inch API
-    await submitOrderTo1inch(orderHash, signature, publicOrder);
-    
-    console.log("✅ Order complete!");
+    console.log("Order saved locally");
+
+    console.log("Order complete!");
     console.log(`Order Hash: ${orderHash}`);
+    console.log(`Expires at: ${new Date(Number(expiration) * 1000).toISOString()}`);
     
   } catch (orderError) {
-    console.error("❌ Order creation failed:", orderError.message);
->>>>>>> Stashed changes
+    console.error("Order creation failed:", orderError.message);
+    console.error("Stack:", orderError.stack);
   }
 }
 
 async function main() {
-  console.log("=== Creating WETH -> USDC Limit Order ===");
+  console.log("=== Creating WETH -> USDC Limit Order with SDK ===");
   console.log("Wallet:", wallet.address);
   
-<<<<<<< Updated upstream
-  console.log("\n=== PUBLIC Order Complete! ===");
-  console.log(`Method Used: ${methodUsed}`);
-  console.log(`Selling: ${makingAmount} ${makerToken.symbol}`);
-  console.log(`For: ${takingAmount} ${takerToken.symbol}`);
-  console.log(`Order Hash: ${orderResult.orderHash}`);
-  console.log(`File: ${filename}`);
-  console.log(`Expires: Never (public order)`);
-  
-  if (apiResult) {
-    console.log(`API Status: Successfully submitted`);
-  }
-=======
   const network = await provider.getNetwork();
   console.log("Network:", network.name);
   
   const optimalGasPrice = await getOptimalGasPrice();
   const ethBalance = await provider.getBalance(wallet.address);
->>>>>>> Stashed changes
   
   console.log("ETH Balance:", ethers.utils.formatEther(ethBalance));
   
@@ -368,50 +221,13 @@ async function main() {
   await verifyContract(ETH_TOKENS.WETH, "WETH");
   await verifyContract(ETH_TOKENS.USDC, "USDC");
   
-<<<<<<< Updated upstream
-  try {
-    // Show current balances
-    console.log("\n=== Current Balances ===");
-    for (const symbol of Object.keys(VALID_TOKENS)) {
-      try {
-        const balance = await getTokenBalance(symbol);
-        if (parseFloat(balance) > 0) {
-          console.log(`${symbol}: ${balance}`);
-        }
-      } catch (error) {
-        // Skip tokens we can't check
-      }
-    }
-    
-    // Test with your WETH balance
-    const wethBalance = await getTokenBalance("WETH");
-    if (parseFloat(wethBalance) > 0) {
-      console.log(`\nTesting with WETH balance: ${wethBalance}`);
-      
-      // Create a small test order: sell 50% of WETH for USDC
-      const sellAmount = (parseFloat(wethBalance) * 0.5).toFixed(6);
-      const expectedUSDC = (parseFloat(sellAmount) * 2650).toFixed(2); // ~$2650/ETH
-      
-      console.log(`\nTest Order: ${sellAmount} WETH -> ${expectedUSDC} USDC`);
-      
-      // Uncomment to actually create the order:
-      // await createPublicLimitOrder("WETH", "USDC", sellAmount, expectedUSDC);
-      
-    } else {
-      console.log("\nNo WETH balance found for testing");
-    }
-    
-  } catch (error) {
-    console.error("Test Error:", error.message);
-=======
   const wethBalance = await checkBalance(ETH_TOKENS.WETH, wallet.address);
   console.log("WETH Balance:", wethBalance ? wethBalance.formatted : '0');
   
   if (wethBalance && parseFloat(wethBalance.formatted) > 0) {
-    await createETHOrderManual(ethBalance, optimalGasPrice);
+    await createETHOrderWithSDK(ethBalance, optimalGasPrice);
   } else {
-    console.log("❌ No WETH balance found");
->>>>>>> Stashed changes
+    console.log("No WETH balance found");
   }
 }
 

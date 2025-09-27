@@ -1,61 +1,88 @@
 {
-  "orderHash": "0xbaaa83905b6e76449fb6913ae9e8899195953d4e69d649b35101240efa829a63",
+  "orderHash": "0xda9e84a3b6bc7174f089b132698cd6e610aa67ac8471a6e009b893f1cead243e",
   "order": {
-    "salt": "1758989709309",
-    "maker": "0xEb2A8b7d64745ae68486DeEb2D38dee0B83e79B0",
-    "receiver": "0x0000000000000000000000000000000000000000",
-    "makerAsset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    "takerAsset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-    "makingAmount": "576664355537832",
-    "takingAmount": "2880000",
-    "extension": "0x",
-    "makerTraits": "0"
+    "maker": "0xeb2a8b7d64745ae68486deeb2d38dee0b83e79b0",
+    "makerAsset": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+    "takerAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "makerTraits": "33471150795161712739625987855197565417424082741339068170764890478444411879424",
+    "salt": "83257611130094062480957262233040718735790586810240971168632299501597024993403",
+    "makingAmount": "18833217776891",
+    "takingAmount": "90000",
+    "receiver": "0xc0dfdb9e7a392c3dbbe7c6fbe8fbc1789c9fe05e"
   },
-  "signature": "0x9941427751ac34d17c3d28dd1a58a58bb01ee348e5aebfb061369341a3249ea77f3e5f07c1fb7ab295fdeb57cf83ecbea834444e0759864761b8bc3c593158b51b",
-  "domain": {
-    "name": "1inch Limit Order Protocol",
-    "version": "4",
-    "chainId": 1,
-    "verifyingContract": "0x111111125421ca6dc452d289314280a0f8842a65"
+  "signature": "0xc7d1df0e343aadbf4106e4dcfde9afa8858506baaccd6b4715c825de57aa697204184b46fa6b909d9703f512180e2187bb8cfb04024ba85b667722a3d0353a741c",
+  "typedData": {
+    "primaryType": "Order",
+    "types": {
+      "EIP712Domain": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "chainId",
+          "type": "uint256"
+        },
+        {
+          "name": "verifyingContract",
+          "type": "address"
+        }
+      ],
+      "Order": [
+        {
+          "name": "salt",
+          "type": "uint256"
+        },
+        {
+          "name": "maker",
+          "type": "address"
+        },
+        {
+          "name": "receiver",
+          "type": "address"
+        },
+        {
+          "name": "makerAsset",
+          "type": "address"
+        },
+        {
+          "name": "takerAsset",
+          "type": "address"
+        },
+        {
+          "name": "makingAmount",
+          "type": "uint256"
+        },
+        {
+          "name": "takingAmount",
+          "type": "uint256"
+        },
+        {
+          "name": "makerTraits",
+          "type": "uint256"
+        }
+      ]
+    },
+    "domain": {
+      "name": "1inch Aggregation Router",
+      "version": "6",
+      "chainId": 1,
+      "verifyingContract": "0x111111125421ca6dc452d289314280a0f8842a65"
+    },
+    "message": {
+      "maker": "0xeb2a8b7d64745ae68486deeb2d38dee0b83e79b0",
+      "makerAsset": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "takerAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "makerTraits": "33471150795161712739625987855197565417424082741339068170764890478444411879424",
+      "salt": "83257611130094062480957262233040718735790586810240971168632299501597024993403",
+      "makingAmount": "18833217776891",
+      "takingAmount": "90000",
+      "receiver": "0xc0dfdb9e7a392c3dbbe7c6fbe8fbc1789c9fe05e"
+    }
   },
-  "types": {
-    "Order": [
-      {
-        "name": "salt",
-        "type": "uint256"
-      },
-      {
-        "name": "maker",
-        "type": "address"
-      },
-      {
-        "name": "receiver",
-        "type": "address"
-      },
-      {
-        "name": "makerAsset",
-        "type": "address"
-      },
-      {
-        "name": "takerAsset",
-        "type": "address"
-      },
-      {
-        "name": "makingAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "takingAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "extension",
-        "type": "bytes"
-      },
-      {
-        "name": "makerTraits",
-        "type": "uint256"
-      }
-    ]
-  }
+  "expiration": "1759084244"
 }
