@@ -1,0 +1,61 @@
+{
+  "orderHash": "0xf0766462577e1ab505ac9a3895e4a1e18561d22dffda149714535d251d7589b9",
+  "order": {
+    "salt": "1758988927149",
+    "maker": "0xEb2A8b7d64745ae68486DeEb2D38dee0B83e79B0",
+    "receiver": "0x0000000000000000000000000000000000000000",
+    "makerAsset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "takerAsset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "makingAmount": "576664355537832",
+    "takingAmount": "2880000",
+    "extension": "0x",
+    "makerTraits": "0"
+  },
+  "signature": "0xeebe5cdb2faa9ade4bcc61ba470624d03b28e3d212a535d70e2d9660b9f38f0a2afcf617c01698a9eefac8ef97fcd89ca9e427fe2136711b1b322ff638477c791c",
+  "domain": {
+    "name": "1inch Limit Order Protocol",
+    "version": "4",
+    "chainId": 1,
+    "verifyingContract": "0x111111125421ca6dc452d289314280a0f8842a65"
+  },
+  "types": {
+    "Order": [
+      {
+        "name": "salt",
+        "type": "uint256"
+      },
+      {
+        "name": "maker",
+        "type": "address"
+      },
+      {
+        "name": "receiver",
+        "type": "address"
+      },
+      {
+        "name": "makerAsset",
+        "type": "address"
+      },
+      {
+        "name": "takerAsset",
+        "type": "address"
+      },
+      {
+        "name": "makingAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "takingAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "extension",
+        "type": "bytes"
+      },
+      {
+        "name": "makerTraits",
+        "type": "uint256"
+      }
+    ]
+  }
+}

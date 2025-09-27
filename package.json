@@ -25,6 +25,10 @@
     "@1inch/limit-order-sdk": "^5.2.0",
     "axios": "^1.12.2",
     "dotenv": "^17.2.2",
-    "ethers": "^5.7.2"
+    "ethers": "^5.7.2",
+    "viem": "^2.37.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }
