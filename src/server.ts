@@ -2,6 +2,7 @@
 import express from "express";
 import { exec } from "child_process";
 import path from "path";
+import cors from "cors";
 
 // Import the limit order functions
 const { 
@@ -23,6 +24,16 @@ import {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enable CORS for all routes and origins
+app.use(cors({
+  origin: '*', // Allow all origins
+  credentials: false, // Disable credentials
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
+
 // Middleware to handle text/plain as JSON
 app.use((req, res, next) => {
   if (req.headers['content-type'] === 'text/plain') {
@@ -35,6 +46,22 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.text()); // Add text parser as backup
+
+// Add CORS headers manually as backup
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Max-Age', '3600');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
 
 // Add logging middleware to debug requests
 app.use((req, res, next) => {
@@ -483,6 +510,7 @@ app.get("/health", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log("🌍 CORS enabled for all origins - No authentication required");
   console.log("Available endpoints:");
   console.log("  POST /swap - Execute token swap");
   console.log("  POST /swap/quote - Get swap quote");
